@@ -15,4 +15,4 @@
 - Сообщение о завершении работы программы
 # Asciinema
 ## Part 1:
-- https://asciinema.org/a/mYiCe40OKBQu90Xe
+- [![asciicast](https://asciinema.org/a/mYiCe40OKBQu90Xe.svg)](https://asciinema.org/a/mYiCe40OKBQu90Xe)
