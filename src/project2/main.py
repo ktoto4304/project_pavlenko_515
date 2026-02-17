@@ -1,2 +1,7 @@
+from .app import Application
+
+
 def main():
-    print("Программа запущена!")
+    """Точка входа."""
+    app = Application()
+    app.run()

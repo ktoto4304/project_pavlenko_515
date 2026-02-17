@@ -1,7 +1,7 @@
 [project]
 name = "project2"
 version = "0.1.0"
-description = "Add your description here"
+description = "An application for analyzing commodity prices (oil, gas, and metals)."
 readme = "README.md"
 authors = [
     { name = "ktoto4304", email = "dp4wlenko@yandex.ru" }
@@ -53,6 +53,9 @@ select = [
   "ASYNC",   
   "G",
   "ANN",
+]
+allowed-confusables = [
+    "б", "с", "р", "о", "а", "е"
 ]
 ignore = [
     "D100", "D104", "D102", "D105", "D107",
