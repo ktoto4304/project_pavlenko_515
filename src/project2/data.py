@@ -1,10 +1,13 @@
+import json
+import os
 import uuid
+from abc import ABC, abstractmethod
 
 
 class Data:
     """Класс Единицы памяти."""
 
-    def __init__(self, name: str, price: float, seller: str, note: str = "Нет примечаний") -> None:
+    def __init__(self, name: str, price: float, seller: str, source: str, note: str = "Нет примечаний") -> None:
         """Инициализирует объект данных о сырье."""
         if type(name) is not str or type(price) is not float or type(seller) is not str:
             raise TypeError()
@@ -15,6 +18,7 @@ class Data:
         self.name: str = name
         self.price: float = price
         self.id: str = seller
+        self.source: str = source
 
     @property
     def name_display(self) -> str:
@@ -52,29 +56,58 @@ class Data:
         return f"Record_ID = {self.record_id}, Data(name='{self.name}', price={self.price}, seller_id='{self.id}')"
 
 
-class Source:
+class Source(ABC):
     """Класс источника."""
 
-    def __init__(self, name: str = "Неизвестный источник", source_type: str = "test") -> None:
+    def __init__(self, name: str, source_type: str) -> None:
         """Инициализирует источник данных."""
         self.name: str = name
         self.type: str = source_type
-        self.data: list[Data] = []
 
-    def add_data(self, data: Data) -> None:
-        """Добавляет объект данных в источник."""
-        self.data.append(data)
+    @abstractmethod
+    def get_data(self) -> list[Data]:
+        """Получает данные из источника и возвращает список объектов Data."""
+        pass
 
-    def delete_data(self, data: Data) -> None:
-        """Удаляет объект данных из источника."""
-        for j in range(len(self.data)):
-            if self.data[j] == data:
-                self.data.remove(self.data[j])
-                break
 
-    @property
-    def return_data(self) -> list[Data]:
-        """Возвращает список всех данных и выводит их на печать."""
-        for i in range(len(self.data)):
-            print(self.data[i])
-        return self.data
+class DemoSource(Source):
+    """Демо-источник с данными прямо в коде."""
+
+    def __init__(self, name: str = "Неизвестно") -> None:
+        """Инициализирует источник данных demo."""
+        super().__init__(name, "demo")
+
+    def get_data(self) -> list[Data]:
+        raw_list = [
+            ["медь", 8745.23, "Норникель", "Нет примечаний"],
+            ["газ", 4.87, "Газпром", "Срочная поставка"],
+            ["золото", 1956.50, "Полюс", "Высокое качество"],
+            ["никель", 17834.91, "Норникель", "Оптовая партия"],
+            ["нефть", 78.45, "Лукойл", "Сезонное предложение"],
+            ["серебро", 25.67, "Полюс", "Нет примечаний"],
+            ["платина", 1056.32, "Норникель", "Высокое качество"],
+            ["алюминий", 2356.78, "Русал", "Срочная поставка"],
+            ["газ", 5.23, "Газпром", "Оптовая партия"],
+            ["медь", 8912.34, "Норникель", "Нет примечаний"]
+        ]
+        data_list = []
+        for i in raw_list:
+            data_list.append(Data(i[0], i[1], i[2], "demo", i[3]))
+        return data_list
+
+
+class FileSource(Source):
+    """Файловый источник, читающий данные из JSON-файла."""
+
+    def __init__(self, filename: str, name: str = "Неизвестно") -> None:
+        """Инициализирует файловый источник данных."""
+        super().__init__(name, "file")
+        self.path: str = os.path.abspath(filename)
+
+    def get_data(self) -> list[Data]:
+        data_list = []
+        with open(self.path, encoding='utf-8') as f:
+            raw_list = json.load(f)
+            for i in raw_list:
+                data_list.append(Data(i[0], i[1], i[2], "file", i[3]))
+        return data_list
