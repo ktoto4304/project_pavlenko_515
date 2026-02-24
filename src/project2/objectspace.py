@@ -4,11 +4,51 @@ from collections.abc import Callable
 from decorators import handle_db_errors
 
 from .data import Data
+from abc import ABC, abstractmethod
 
 
-class DataProcessing:
-    """Класс для обработки данных о сырье."""
-
+class DataProcessing(ABC):
+    """Класс обработчика данных."""
+    
+    @abstractmethod
+    def normalizing(self, data_info: list[Data]) -> list[Data]:
+        """Нормализация информации."""
+        pass
+    
+    @abstractmethod
+    def filter_registration(self,key:str,func: Callable) -> None:
+        """Добавляет новый ключ фильтрации."""
+        pass
+    
+    @abstractmethod
+    def filter(self, key: str,source_data: list[Data], param: str) -> list[Data] | None:
+        """Основная функция фильтрации информации."""
+        pass
+    
+    @abstractmethod
+    def filter_category(self, data_info: list[Data], category: str) -> list[Data]:
+        """Фильтрует записи по указанной категориям."""
+        pass
+    
+    @abstractmethod
+    def filter_price(self, data_info: list[Data], param: str) -> list[Data]:
+        """Фильтрует записи по диапазону цен."""
+        pass
+    
+    @abstractmethod
+    def filter_seller(self, data_info: list[Data], seller: str) -> list[Data]:
+        """Фильтрует записи по указанному продавцу."""
+        pass
+    @abstractmethod
+    def average_price(self, data_info: list[Data]) -> float:
+        """Вычисляет среднюю цену всех записей."""
+        pass
+    @abstractmethod
+    def word_counter(self, data: Data) -> int:
+        """Подсчитывает количество слов в названии."""
+        pass
+class CommodityProcessing(DataProcessing):
+    """Класс обработчика данных о сырье."""
     def __init__(self, name: str = "Обработчик") -> None:
         """Инициализирует обработчик данных с указанным именем."""
         self.name: str = name
@@ -16,7 +56,7 @@ class DataProcessing:
     @handle_db_errors
     def normalizing(self, data_info: list[Data]) -> list[Data]:
         """Нормализует названия сырья, приводя к нижнему регистру и удаляя пробелы."""
-        normilized_count = 0
+        normalized_count = 0
         to_delete: list[int] = []
         for i in range(len(data_info)):
             original_name = data_info[i].name
@@ -24,10 +64,10 @@ class DataProcessing:
                 to_delete.append(i)
             data_info[i].name = data_info[i].name.lower().strip()
             if data_info[i].name != original_name:
-                normilized_count += 1
+                normalized_count += 1
         for i in reversed(to_delete):
             data_info.pop(i)
-        data_info.append(normilized_count)
+        data_info.append(normalized_count)
         return data_info
     @handle_db_errors
     def filter_registration(self,key:str,func: Callable) -> None:
@@ -66,7 +106,6 @@ class DataProcessing:
             if data_info[i].id == seller:
                 result.append(data_info[i])
         return result
-
     def average_price(self, data_info: list[Data]) -> float:
         """Вычисляет среднюю цену всех записей."""
         total = 0.0
@@ -75,7 +114,6 @@ class DataProcessing:
             total += data_info[i].price
             count += 1
         return total / count if count > 0 else 0.0
-
     def word_counter(self, data: Data) -> int:
         """Подсчитывает количество слов в названии сырья."""
         splitted = data.name.split(" ")

@@ -54,6 +54,33 @@ class Data:
     def __repr__(self) -> str:
         """Возвращает формальное строковое представление объекта."""
         return f"Record_ID = {self.record_id}, Data(name='{self.name}', price={self.price}, seller_id='{self.id}')"
+    
+    def __lt__(self, second: 'Data') -> bool:
+        """Меньше (<) - по ценe."""
+        if not isinstance(second, Data):
+            return NotImplemented
+        return self.price < second.price
+    def __le__(self, second: 'Data') -> bool:
+        """Меньше или равно (<=) - по цене."""
+        if not isinstance(second, Data):
+            return NotImplemented
+        return self.price <= second.price
+    def __gt__(self, second: 'Data') -> bool:
+        """Больше (>) - по цене."""
+        if not isinstance(second, Data):
+            return NotImplemented
+        return self.price > second.price
+    def __ge__(self, second: 'Data') -> bool:
+        """Больше или равно (>=) - по цене."""
+        if not isinstance(second, Data):
+            return NotImplemented
+        return self.price >= second.price
+    def __eq__(self, second: 'Data') -> bool:
+        """Равно (=) - по уникальному ID."""
+        if not isinstance(second, Data):
+            return NotImplemented
+        return self.id == second.id
+
 
 
 class Source(ABC):

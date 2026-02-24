@@ -1,7 +1,7 @@
 
 from decorators import handle_db_errors
 
-from .data import Data, Source
+from .data import Source
 from .objectspace import DataProcessing
 
 
@@ -10,11 +10,11 @@ class Application:
 
     def __init__(self, sources: list[Source], data_proc: DataProcessing) -> None:
         """Инициализирует приложение со списком источников и обработчиком."""
-        self.name: str = "Main_Application"
-        self.sources: list[Source] = sources
-        self.data_proc: DataProcessing = data_proc
-        self.data: list[Data] = []
-        self.filter_info: list[list[str | int]] = []
+        self.name = "Main_Application"
+        self.sources = sources
+        self.data_proc = data_proc
+        self.data = []
+        self.filter_info = []
 
     @handle_db_errors
     def show_source_stats(self, source: Source) -> None:
