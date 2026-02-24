@@ -1,40 +1,40 @@
 
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 
 from decorators import handle_db_errors
 
 from .data import Data
-from abc import ABC, abstractmethod
 
 
 class DataProcessing(ABC):
     """Класс обработчика данных."""
-    
+
     @abstractmethod
     def normalizing(self, data_info: list[Data]) -> list[Data]:
         """Нормализация информации."""
         pass
-    
+
     @abstractmethod
     def filter_registration(self,key:str,func: Callable) -> None:
         """Добавляет новый ключ фильтрации."""
         pass
-    
+
     @abstractmethod
     def filter(self, key: str,source_data: list[Data], param: str) -> list[Data] | None:
         """Основная функция фильтрации информации."""
         pass
-    
+
     @abstractmethod
     def filter_category(self, data_info: list[Data], category: str) -> list[Data]:
         """Фильтрует записи по указанной категориям."""
         pass
-    
+
     @abstractmethod
     def filter_price(self, data_info: list[Data], param: str) -> list[Data]:
         """Фильтрует записи по диапазону цен."""
         pass
-    
+
     @abstractmethod
     def filter_seller(self, data_info: list[Data], seller: str) -> list[Data]:
         """Фильтрует записи по указанному продавцу."""

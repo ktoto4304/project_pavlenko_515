@@ -54,7 +54,7 @@ class Data:
     def __repr__(self) -> str:
         """Возвращает формальное строковое представление объекта."""
         return f"Record_ID = {self.record_id}, Data(name='{self.name}', price={self.price}, seller_id='{self.id}')"
-    
+
     def __lt__(self, second: 'Data') -> bool:
         """Меньше (<) - по ценe."""
         if not isinstance(second, Data):
@@ -129,7 +129,7 @@ class FileSource(Source):
     def __init__(self, filename: str, name: str = "Неизвестно") -> None:
         """Инициализирует файловый источник данных."""
         super().__init__(name, "file")
-        self.path: str = os.path.abspath(filename)
+        self.path = os.path.abspath(filename)
 
     def get_data(self) -> list[Data]:
         data_list = []
