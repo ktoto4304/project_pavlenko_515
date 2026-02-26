@@ -96,7 +96,7 @@ class Application:
         print("ФИЛЬТРАЦИЯ ПО ЦЕНЕ (1000 д.е.-5000 д.е.):")
         self.filter("Price", "1000.0-5000.0")
         print("ФИЛЬТРАЦИЯ ПО ПРОДАВЦУ:")
-        self.filter("Seller", "Лукойл")
+        self.filter("Seller", "Норникель")
         print("ОБЩАЯ СТАТИСТИКА:")
         self.show_general_stats()
         print("ПРИЛОЖЕНИЕ УСПЕШНО ЗАВЕРШЕНО")

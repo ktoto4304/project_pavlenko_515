@@ -52,11 +52,11 @@ class CommodityProcessing(DataProcessing):
     def __init__(self, name: str = "Обработчик") -> None:
         """Инициализирует обработчик данных с указанным именем."""
         self.name: str = name
-        self.filters = {}
+        self._filters = {}
     @handle_db_errors
     def normalizing(self, data_info: list[Data]) -> list[Data]:
         """Нормализует названия сырья, приводя к нижнему регистру и удаляя пробелы."""
-        normalized_count = 0
+        _normalized_count = 0
         to_delete: list[int] = []
         for i in range(len(data_info)):
             original_name = data_info[i].name
@@ -64,22 +64,22 @@ class CommodityProcessing(DataProcessing):
                 to_delete.append(i)
             data_info[i].name = data_info[i].name.lower().strip()
             if data_info[i].name != original_name:
-                normalized_count += 1
+                _normalized_count += 1
         for i in reversed(to_delete):
             data_info.pop(i)
-        data_info.append(normalized_count)
+        data_info.append(_normalized_count)
         return data_info
     @handle_db_errors
     def filter_registration(self,key:str,func: Callable) -> None:
         """Добавляет новый ключ фильтрации."""
-        self.filters[key] = func
+        self._filters[key] = func
         return
     @handle_db_errors
     def filter(self, key: str,source_data: list[Data], param: str) -> list[Data] | None:
         """Основная функция фильтрации информации."""
-        if key not in self.filters.keys():
+        if key not in self._filters.keys():
             raise ValueError(f"Поле {key} не существует/нельзя провести фильтрацию")
-        return self.filters[key](source_data,param)
+        return self._filters[key](source_data,param)
     @handle_db_errors
     def filter_category(self, data_info: list[Data], category: str) -> list[Data]:
         """Фильтрует записи по указанной категории сырья."""
@@ -99,11 +99,11 @@ class CommodityProcessing(DataProcessing):
                 result.append(data_info[i])
         return result
     @handle_db_errors
-    def filter_seller(self, data_info: list[Data], seller: str) -> list[Data]:
+    def filter_seller(self, data_info: list[Data], seller: int) -> list[Data]:
         """Фильтрует записи по указанному продавцу."""
         result = []
         for i in range(len(data_info)):
-            if data_info[i].id == seller:
+            if data_info[i].seller.get_name == seller:
                 result.append(data_info[i])
         return result
     def average_price(self, data_info: list[Data]) -> float:

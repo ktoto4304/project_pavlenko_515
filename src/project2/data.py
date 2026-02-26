@@ -7,18 +7,18 @@ from abc import ABC, abstractmethod
 class Data:
     """Класс Единицы памяти."""
 
-    def __init__(self, name: str, price: float, seller: str, source: str, note: str = "Нет примечаний") -> None:
+    def __init__(self, name: str, seller_name: str, price: float, seller_id: int, source: str, note: str = "Нет примечаний") -> None:
         """Инициализирует объект данных о сырье."""
-        if type(name) is not str or type(price) is not float or type(seller) is not str:
+        if type(name) is not str or type(price) is not float or type(seller_id) is not int or type(seller_name) is not str:
             raise TypeError()
         if price <= 0:
             raise ValueError()
-        self.record_id: str = str(uuid.uuid4())[:8]
+        self._record_id: str = str(uuid.uuid4())[:8]
         self.note: str = note
         self.name: str = name
         self.price: float = price
-        self.id: str = seller
         self.source: str = source
+        self.seller = Sellerinfo(seller_name, seller_id)
 
     @property
     def name_display(self) -> str:
@@ -33,7 +33,7 @@ class Data:
     @property
     def seller_display(self) -> str:
         """Возвращает отформатированную информацию о продавце."""
-        return f"Компания - {self.id}"
+        return f"Компания - {self._id}"
 
     @property
     def record_display(self) -> str:
@@ -49,11 +49,12 @@ class Data:
 
     def __str__(self) -> str:
         """Возвращает строковое представление объекта."""
-        return f"{self.name}: {self.price} (Продавец: {self.id})"
+        
+        return f"{self.name}: {self.price} (Продавец: {self.seller.get_name})"
 
     def __repr__(self) -> str:
         """Возвращает формальное строковое представление объекта."""
-        return f"Record_ID = {self.record_id}, Data(name='{self.name}', price={self.price}, seller_id='{self.id}')"
+        return f"Record_ID = {self.record_id}, Data(name='{self.name}', price={self.price}, seller_id='{self.seller.get_id}')"
 
     def __lt__(self, second: 'Data') -> bool:
         """Меньше (<) - по ценe."""
@@ -106,20 +107,20 @@ class DemoSource(Source):
 
     def get_data(self) -> list[Data]:
         raw_list = [
-            ["медь", 8745.23, "Норникель", "Нет примечаний"],
-            ["газ", 4.87, "Газпром", "Срочная поставка"],
-            ["золото", 1956.50, "Полюс", "Высокое качество"],
-            ["никель", 17834.91, "Норникель", "Оптовая партия"],
-            ["нефть", 78.45, "Лукойл", "Сезонное предложение"],
-            ["серебро", 25.67, "Полюс", "Нет примечаний"],
-            ["платина", 1056.32, "Норникель", "Высокое качество"],
-            ["алюминий", 2356.78, "Русал", "Срочная поставка"],
-            ["газ", 5.23, "Газпром", "Оптовая партия"],
-            ["медь", 8912.34, "Норникель", "Нет примечаний"]
+            ["медь", "Норникель", 1, 8745.23, "Нет примечаний"],
+            ["газ", "Газпром", 2, 4.87, "Срочная поставка"],
+            ["золото", "Полюс", 3, 1956.50, "Высокое качество"],
+            ["никель", "Норникель", 1, 17834.91, "Оптовая партия"],
+            ["нефть", "Лукойл", 4, 78.45, "Сезонное предложение"],
+            ["серебро", "Полюс", 3, 25.67, "Нет примечаний"],
+            ["платина", "Норникель", 1, 1056.32, "Высокое качество"],
+            ["алюминий", "Русал", 5, 2356.78, "Срочная поставка"],
+            ["газ", "Газпром", 2, 5.23, "Оптовая партия"],
+            ["медь", "Норникель", 1, 8912.34, "Нет примечаний"]
         ]
         data_list = []
         for i in raw_list:
-            data_list.append(Data(i[0], i[1], i[2], "demo", i[3]))
+            data_list.append(Data(i[0], i[1], i[3], i[2], "demo", i[4]))
         return data_list
 
 
@@ -136,5 +137,18 @@ class FileSource(Source):
         with open(self.path, encoding='utf-8') as f:
             raw_list = json.load(f)
             for i in raw_list:
-                data_list.append(Data(i[0], i[1], i[2], "file", i[3]))
+                data_list.append(Data(i[0], i[1], i[3], i[2], "file", i[4]))
         return data_list
+class Sellerinfo:
+    """Информация о продавце"""
+    def __init__(self,name: str, id: int) -> None:
+        self._id = id
+        self.name = name
+    @property
+    def get_name(self) -> str:
+        """Возвращает наименование компании продавца"""
+        return self.name
+    @property
+    def get_id(self) -> int:
+        """Возвращает ID компании продавца"""
+        return self._id
