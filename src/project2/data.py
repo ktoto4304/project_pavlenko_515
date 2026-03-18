@@ -7,9 +7,11 @@ from abc import ABC, abstractmethod
 class Data:
     """Класс Единицы памяти."""
 
-    def __init__(self, name: str, seller_name: str, price: float, seller_id: int, source: str, note: str = "Нет примечаний") -> None:
+    def __init__(self, name: str, seller_name: str, price: float,\
+                  seller_id: int, source: str, note: str = "Нет примечаний") -> None:
         """Инициализирует объект данных о сырье."""
-        if type(name) is not str or type(price) is not float or type(seller_id) is not int or type(seller_name) is not str:
+        if type(name) is not str or type(price) is not float or\
+             type(seller_id) is not int or type(seller_name) is not str:
             raise TypeError()
         if price <= 0:
             raise ValueError()
@@ -49,12 +51,13 @@ class Data:
 
     def __str__(self) -> str:
         """Возвращает строковое представление объекта."""
-        
         return f"{self.name}: {self.price} (Продавец: {self.seller.get_name})"
 
     def __repr__(self) -> str:
         """Возвращает формальное строковое представление объекта."""
-        return f"Record_ID = {self.record_id}, Data(name='{self.name}', price={self.price}, seller_id='{self.seller.get_id}')"
+        return (f"Record_ID = {self.record_id}\n"
+        f"Data(name='{self.name}', price={self.price}, "
+        f"seller_id='{self.seller.get_id}')")
 
     def __lt__(self, second: 'Data') -> bool:
         """Меньше (<) - по ценe."""
@@ -140,15 +143,15 @@ class FileSource(Source):
                 data_list.append(Data(i[0], i[1], i[3], i[2], "file", i[4]))
         return data_list
 class Sellerinfo:
-    """Информация о продавце"""
+    """Информация о продавце."""
     def __init__(self,name: str, id: int) -> None:
         self._id = id
         self.name = name
     @property
     def get_name(self) -> str:
-        """Возвращает наименование компании продавца"""
+        """Возвращает наименование компании продавца."""
         return self.name
     @property
     def get_id(self) -> int:
-        """Возвращает ID компании продавца"""
+        """Возвращает ID компании продавца."""
         return self._id

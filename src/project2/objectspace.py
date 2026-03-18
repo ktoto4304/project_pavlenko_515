@@ -67,8 +67,7 @@ class CommodityProcessing(DataProcessing):
                 _normalized_count += 1
         for i in reversed(to_delete):
             data_info.pop(i)
-        data_info.append(_normalized_count)
-        return data_info
+        return data_info,_normalized_count
     @handle_db_errors
     def filter_registration(self,key:str,func: Callable) -> None:
         """Добавляет новый ключ фильтрации."""
