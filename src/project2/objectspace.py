@@ -1,6 +1,5 @@
-
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 
 from decorators import handle_db_errors
 
@@ -11,42 +10,41 @@ class DataProcessing(ABC):
     """Класс обработчика данных."""
 
     @abstractmethod
-    def normalizing(self, data_info: list[Data]) -> list[Data]:
-        """Нормализация информации."""
+    def normalizing(self, data_iterator: Iterator[Data]) -> Iterator[tuple[Data, bool]]:
+        """Нормализация информации. Возвращает итератор с кортежами."""
         pass
 
     @abstractmethod
-    def filter_registration(self,key:str,func: Callable) -> None:
+    def filter_registration(self, key: str, func: Callable) -> None:
         """Добавляет новый ключ фильтрации."""
         pass
 
     @abstractmethod
-    def filter(self, key: str,source_data: list[Data], param: str) -> list[Data] | None:
+    def filter(self, key: str, data_iterator: Iterator[Data], param: str) -> Iterator[Data]:
         """Основная функция фильтрации информации."""
         pass
 
     @abstractmethod
-    def filter_category(self, data_info: list[Data], category: str) -> list[Data]:
+    def filter_category(self, data_iterator: Iterator[Data], category: str) -> Iterator[Data]:
         """Фильтрует записи по указанной категориям."""
         pass
 
     @abstractmethod
-    def filter_price(self, data_info: list[Data], param: str) -> list[Data]:
+    def filter_price(self, data_iterator: Iterator[Data], param: str) -> Iterator[Data]:
         """Фильтрует записи по диапазону цен."""
         pass
 
     @abstractmethod
-    def filter_seller(self, data_info: list[Data], seller: str) -> list[Data]:
+    def filter_seller(self, data_iterator: Iterator[Data], seller: str) -> Iterator[Data]:
         """Фильтрует записи по указанному продавцу."""
         pass
+
     @abstractmethod
-    def average_price(self, data_info: list[Data]) -> float:
+    def average_price(self, data_iterator: Iterator[Data]) -> float:
         """Вычисляет среднюю цену всех записей."""
         pass
-    @abstractmethod
-    def word_counter(self, data: Data) -> int:
-        """Подсчитывает количество слов в названии."""
-        pass
+
+
 class CommodityProcessing(DataProcessing):
     """Класс обработчика данных о сырье."""
     def __init__(self, name: str = "Обработчик") -> None:
@@ -54,66 +52,60 @@ class CommodityProcessing(DataProcessing):
         self.name: str = name
         self._filters = {}
     @handle_db_errors
-    def normalizing(self, data_info: list[Data]) -> list[Data]:
+    def normalizing(self, data_iterator: Iterator[Data]) -> Iterator[tuple[Data, bool]]:
         """Нормализует названия сырья, приводя к нижнему регистру и удаляя пробелы."""
-        _normalized_count = 0
-        to_delete: list[int] = []
-        for i in range(len(data_info)):
-            original_name = data_info[i].name
-            if not original_name or not original_name.strip():
-                to_delete.append(i)
-            data_info[i].name = data_info[i].name.lower().strip()
-            if data_info[i].name != original_name:
-                _normalized_count += 1
-        for i in reversed(to_delete):
-            data_info.pop(i)
-        return data_info,_normalized_count
+        for data in data_iterator:
+            if data is None:
+                continue
+            original_name = data.name
+            if not original_name or not isinstance(original_name, str):
+                yield data, False
+                continue
+            normalized_name = original_name.lower().strip()
+            data.name = normalized_name
+            was_normalized = (normalized_name != original_name)
+            yield data, was_normalized
     @handle_db_errors
-    def filter_registration(self,key:str,func: Callable) -> None:
+    def filter_registration(self, key: str, func: Callable) -> None:
         """Добавляет новый ключ фильтрации."""
         self._filters[key] = func
-        return
     @handle_db_errors
-    def filter(self, key: str,source_data: list[Data], param: str) -> list[Data] | None:
+    def filter(self, key: str, data_iterator: Iterator[Data], param: str) -> Iterator[Data]:
         """Основная функция фильтрации информации."""
-        if key not in self._filters.keys():
+        if key not in self._filters:
             raise ValueError(f"Поле {key} не существует/нельзя провести фильтрацию")
-        return self._filters[key](source_data,param)
+        filter_func = self._filters[key]
+        return filter_func(data_iterator, param)
     @handle_db_errors
-    def filter_category(self, data_info: list[Data], category: str) -> list[Data]:
+    def filter_category(self, data_iterator: Iterator[Data], category: str) -> Iterator[Data]:
         """Фильтрует записи по указанной категории сырья."""
-        result = []
-        for i in range(len(data_info)):
-            if data_info[i].name == category:
-                result.append(data_info[i])
-        return result
+        for data in data_iterator:
+            if data.name.lower().strip() == category.lower().strip():
+                yield data
     @handle_db_errors
-    def filter_price(self, data_info: list[Data], param: str) -> list[Data]:
+    def filter_price(self, data_iterator: Iterator[Data], param: str) -> Iterator[Data]:
         """Фильтрует записи по диапазону цен."""
-        result = []
-        price_range = param.split("-")
-        min_price,max_price = float(price_range[0]),float(price_range[1])
-        for i in range(len(data_info)):
-            if min_price <= data_info[i].price <= max_price:
-                result.append(data_info[i])
-        return result
+        try:
+            price_range = param.split("-")
+            min_price, max_price = float(price_range[0]), float(price_range[1])
+        except (ValueError, IndexError):
+            print(f"Ошибка формата диапазона цен: {param}")
+            return
+        for data in data_iterator:
+            if min_price <= data.price <= max_price:
+                yield data
     @handle_db_errors
-    def filter_seller(self, data_info: list[Data], seller: int) -> list[Data]:
+    def filter_seller(self, data_iterator: Iterator[Data], seller: str) -> Iterator[Data]:
         """Фильтрует записи по указанному продавцу."""
-        result = []
-        for i in range(len(data_info)):
-            if data_info[i].seller.get_name == seller:
-                result.append(data_info[i])
-        return result
-    def average_price(self, data_info: list[Data]) -> float:
+        for data in data_iterator:
+            if data.seller.get_name == seller:
+                yield data
+    @handle_db_errors
+    def average_price(self, data_iterator: Iterator[Data]) -> float:
         """Вычисляет среднюю цену всех записей."""
         total = 0.0
         count = 0
-        for i in range(len(data_info)):
-            total += data_info[i].price
+        for data in data_iterator:
+            total += data.price
             count += 1
-        return total / count if count > 0 else 0.0
-    def word_counter(self, data: Data) -> int:
-        """Подсчитывает количество слов в названии сырья."""
-        splitted = data.name.split(" ")
-        return len(splitted)
+        return total / count

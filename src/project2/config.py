@@ -9,7 +9,7 @@ class AppConfig:
         return cls._instance
 
     def __init__(self):
-        """Инициализация конфигурации (только один раз)."""
+        """Инициализация конфигурации."""
         if self._initialized:
             return
         self.demo_source_name = "Рынок Энергоносителей"

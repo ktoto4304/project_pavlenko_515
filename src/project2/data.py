@@ -2,6 +2,7 @@ import json
 import os
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 
 
 class Data:
@@ -100,7 +101,6 @@ class Source(ABC):
         """Получает данные из источника и возвращает список объектов Data."""
         pass
 
-
 class DemoSource(Source):
     """Демо-источник с данными прямо в коде."""
 
@@ -108,7 +108,8 @@ class DemoSource(Source):
         """Инициализирует источник данных demo."""
         super().__init__(name, "demo")
 
-    def get_data(self) -> list[Data]:
+    def get_data(self) -> Iterator[Data]:
+        """Генерирует объекты Data по одному."""
         raw_list = [
             ["медь", "Норникель", 1, 8745.23, "Нет примечаний"],
             ["газ", "Газпром", 2, 4.87, "Срочная поставка"],
@@ -121,27 +122,32 @@ class DemoSource(Source):
             ["газ", "Газпром", 2, 5.23, "Оптовая партия"],
             ["медь", "Норникель", 1, 8912.34, "Нет примечаний"]
         ]
-        data_list = []
-        for i in raw_list:
-            data_list.append(Data(i[0], i[1], i[3], i[2], "demo", i[4]))
-        return data_list
+
+        for item in raw_list:
+            yield Data(item[0], item[1], item[3], item[2], "demo", item[4])
 
 
 class FileSource(Source):
-    """Файловый источник, читающий данные из JSON-файла."""
+    """Файловый источник, читающий данные из JSON-файла построчно."""
 
     def __init__(self, filename: str, name: str = "Неизвестно") -> None:
         """Инициализирует файловый источник данных."""
         super().__init__(name, "file")
         self.path = os.path.abspath(filename)
 
-    def get_data(self) -> list[Data]:
-        data_list = []
+    def get_data(self) -> Iterator[Data]:
+        """Генерирует объекты Data из файла по одному, используя контекстный менеджер."""
         with open(self.path, encoding='utf-8') as f:
-            raw_list = json.load(f)
-            for i in raw_list:
-                data_list.append(Data(i[0], i[1], i[3], i[2], "file", i[4]))
-        return data_list
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    item = json.loads(line)
+                    yield Data(item[0], item[1], item[3], item[2], "file", item[4])
+                except json.JSONDecodeError as e:
+                    print(f"Ошибка парсинга строки: {e}")
+                    continue
 class Sellerinfo:
     """Информация о продавце."""
     def __init__(self,name: str, id: int) -> None:
