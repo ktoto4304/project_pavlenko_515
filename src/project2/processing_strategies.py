@@ -1,6 +1,5 @@
-# processing_strategies.py
 from abc import ABC, abstractmethod
-from typing import Any, Iterator
+from collections.abc import Iterator
 
 from .config import get_config
 from .data import Data
@@ -17,26 +16,19 @@ class ProcessingStrategy(ABC):
 
 class NormalizationStrategy(ProcessingStrategy):
     """Стратегия нормализации данных."""
-    
     def process(self, data_iterator: Iterator[Data], processor: CommodityProcessing,
                 **kwargs) -> Iterator[Data]:
-        print("НОРМАЛИЗАЦИЯ:")
         normalized_count = 0
         result_data = []
-        try:
-            for data, was_normalized in processor.normalizing(data_iterator):
-                if was_normalized:
-                    normalized_count += 1
-                result_data.append(data)
-        except Exception as e:
-            print(f"Ошибка при нормализации: {e}")
-            return iter(result_data)
+        for data, was_normalized in processor.normalizing(data_iterator):
+            if was_normalized:
+                normalized_count += 1
+            result_data.append(data)
         if normalized_count == 0:
             print("Нормализация не требуется")
         else:
             print(f"Успешно нормализовано {normalized_count} объекта/ов")
         return iter(result_data)
-
 
 class FilterStrategy(ProcessingStrategy):
     """Стратегия фильтрации данных."""
@@ -46,11 +38,7 @@ class FilterStrategy(ProcessingStrategy):
         param = kwargs.get('param')
         if not key or not param:
             raise ValueError("Не указаны ключ или параметр фильтрации")
-        try:
-            result = list(processor.filter(key, data_iterator, param))
-        except ValueError as e:
-            print(f"Ошибка фильтрации: {e}")
-            return iter([])
+        result = list(processor.filter(key, data_iterator, param))
         if not result:
             print(f"Записей по ключу \"{param}\"({key}) не найдено")
         else:
@@ -58,7 +46,6 @@ class FilterStrategy(ProcessingStrategy):
             for item in result:
                 print(item)
         return iter(result)
-
 
 class StatisticsStrategy(ProcessingStrategy):
     """Стратегия расчета статистики."""
@@ -90,7 +77,6 @@ class CompositeStrategy(ProcessingStrategy):
         self.processor.filter_registration("Category", self.processor.filter_category)
         self.processor.filter_registration("Price", self.processor.filter_price)
         self.processor.filter_registration("Seller", self.processor.filter_seller)
-    
     def process(self, data_iterator: Iterator[Data], **kwargs) -> Iterator[Data]:
         all_data = list(data_iterator)
         if not all_data:
@@ -102,34 +88,22 @@ class CompositeStrategy(ProcessingStrategy):
                 print("ФИЛЬТРАЦИЯ ПО КАТЕГОРИЯМ:")
                 for category in self.config.categories:
                     print(f"\n  Категория '{category}':")
-                    try:
-                        filtered = list(strategy.process(iter(all_data), self.processor, key="Category", param=category))
-                        filter_info.append(["Category", category, len(filtered)])
-                    except Exception as e:
-                        print(f"Ошибка при фильтрации по категории {category}: {e}")
+                    filtered = list(strategy.process(iter(all_data),
+                                            self.processor, key="Category", param=category))
+                    filter_info.append(["Category", category, len(filtered)])
                 print("\nФИЛЬТРАЦИЯ ПО ЦЕНЕ (1000 д.е.-5000 д.е.):")
-                try:
-                    price_filtered = list(strategy.process(iter(all_data), self.processor, key="Price", param=self.config.price_range))
-                    filter_info.append(["Price", self.config.price_range, len(price_filtered)])
-                except Exception as e:
-                    print(f"Ошибка при фильтрации по цене: {e}")
+                price_filtered = list(strategy.process(iter(all_data),
+                                                self.processor, key="Price", param=self.config.price_range))
+                filter_info.append(["Price", self.config.price_range, len(price_filtered)])
                 print("\nФИЛЬТРАЦИЯ ПО ПРОДАВЦУ:")
-                try:
-                    seller_filtered = list(strategy.process(iter(all_data), self.processor, key="Seller", param=self.config.seller))
-                    filter_info.append(["Seller", self.config.seller, len(seller_filtered)])
-                except Exception as e:
-                    print(f"Ошибка при фильтрации по продавцу: {e}")
+                seller_filtered = list(strategy.process(iter(all_data),
+                                                self.processor, key="Seller", param=self.config.seller))
+                filter_info.append(["Seller", self.config.seller, len(seller_filtered)])
             elif isinstance(strategy, NormalizationStrategy):
                 print("\nНОРМАЛИЗАЦИЯ:")
-                try:
-                    normalized_data = list(strategy.process(iter(all_data), self.processor))
-                    if normalized_data:
-                        all_data = normalized_data
-                except Exception as e:
-                    print(f"Ошибка при нормализации: {e}")
+                normalized_data = list(strategy.process(iter(all_data), self.processor))
+                if normalized_data:
+                    all_data = normalized_data
             elif isinstance(strategy, StatisticsStrategy):
-                try:
-                    all_data = list(strategy.process(iter(all_data), self.processor, info=filter_info))
-                except Exception as e:
-                    print(f"Ошибка при расчете статистики: {e}")
+                all_data = list(strategy.process(iter(all_data), self.processor, info=filter_info))
         return iter(all_data)

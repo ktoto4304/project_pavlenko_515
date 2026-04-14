@@ -4,6 +4,8 @@ import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 
+from decorators import handle_db_errors
+
 
 class Data:
     """Класс Единицы памяти."""
@@ -126,28 +128,33 @@ class DemoSource(Source):
         for item in raw_list:
             yield Data(item[0], item[1], item[3], item[2], "demo", item[4])
 
-
 class FileSource(Source):
     """Файловый источник, читающий данные из JSON-файла построчно."""
-
     def __init__(self, filename: str, name: str = "Неизвестно") -> None:
         """Инициализирует файловый источник данных."""
         super().__init__(name, "file")
         self.path = os.path.abspath(filename)
-
+    @handle_db_errors
     def get_data(self) -> Iterator[Data]:
         """Генерирует объекты Data из файла по одному, используя контекстный менеджер."""
         with open(self.path, encoding='utf-8') as f:
-            for line in f:
+            for line_num, line in enumerate(f, 1):
                 line = line.strip()
                 if not line:
+                   continue
+                item = json.loads(line)
+                if isinstance(item, dict):
+                    name = item.get("name", "")
+                    seller = item.get("seller", "")
+                    price = float(item.get("price", 0))
+                    seller_id = int(item.get("seller_id", 0))
+                    note = item.get("note", "Нет примечаний")
+                elif isinstance(item, list):
+                    name, seller, seller_id, price, note = item
+                else:
+                    print(f"Строка {line_num}: Неподдерживаемый формат")
                     continue
-                try:
-                    item = json.loads(line)
-                    yield Data(item[0], item[1], item[3], item[2], "file", item[4])
-                except json.JSONDecodeError as e:
-                    print(f"Ошибка парсинга строки: {e}")
-                    continue
+                yield Data(name, seller, price, seller_id, "file", note)
 class Sellerinfo:
     """Информация о продавце."""
     def __init__(self,name: str, id: int) -> None:
