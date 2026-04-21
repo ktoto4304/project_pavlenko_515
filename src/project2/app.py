@@ -3,6 +3,7 @@ from collections.abc import Iterator
 
 from decorators import handle_db_errors
 
+from .concurent_executor import ConcurrentProcessor
 from .config import get_config
 from .data import Data, Source
 from .processing_strategies import ProcessingStrategy
@@ -11,14 +12,20 @@ from .web_parsing.parsfactory import create_web_parser
 
 class Application:
     """Класс основного приложения."""
+
     def __init__(self, sources: list[Source], strategy: ProcessingStrategy) -> None:
         self.name = "Main_Application"
         self.sources = sources
         self.strategy = strategy
         self.config = get_config()
+        self.concurrent_processor = ConcurrentProcessor(mode=self.config.execution_mode)
 
     def _setup_web_source(self) -> None:
         """Настраивает веб-источник (внутренний метод)."""
+        if self.config.test_mode:
+            print("ТЕСТОВЫЙ РЕЖИМ: веб-источник пропущен")
+            return
+
         print("ИНИЦИАЛИЗАЦИЯ ВЕБ-ПАРСЕРА")
         if os.path.exists(self.config.web_source_path):
             print(f"Файл {self.config.web_source_path} уже существует")
@@ -44,26 +51,64 @@ class Application:
 
     @handle_db_errors
     def show_source_stats(self, source: Source, data_iterator: Iterator[Data]) -> list[Data]:
-        """Выводит статистику по отдельному источнику."""
+        """Выводит статистику по отдельному источнику и возвращает данные."""
         print(f"Имя источника: {source.name}")
         data_list = list(data_iterator)
         print(f"Количество записей: {len(data_list)}, тип источника: {source.type}")
-        for data in data_list:
-            print(data)
+        if not self.config.test_mode:
+            for data in data_list:
+                print(data)
         return data_list
 
-    @handle_db_errors
-    def process_with_strategy(self, data_iterator: Iterator[Data], **kwargs) -> Iterator[Data]:
-        """Применяет стратегию к данным."""
-        return self.strategy.process(data_iterator, **kwargs)
+    def _process_chunk(self, chunk: list[Data]) -> list[Data]:
+        if not chunk:
+            return []
+        return list(self.strategy.process(iter(chunk)))
 
-    @handle_db_errors
-    def run(self) -> None:
-        """Запускает конвейер обработки."""
+    @staticmethod
+    def _identity_data(data_chunk: list) -> list:
+        """Статический метод для передачи данных (picklable для процессов)."""
+        return data_chunk
+
+    def run(self) -> tuple[list[Data], float]:
+        """Запускает приложение и возвращает результат и время выполнения."""
         self._setup_web_source()
-        all_data = []
-        for source in self.sources:
-            source_iterator = source.get_data()
-            source_data = self.show_source_stats(source, source_iterator)
-            all_data.extend(source_data)
+        print("СБОР ДАННЫХ ИЗ ИСТОЧНИКОВ")
+
+        start_collect = __import__('time').time()
+
+        if self.config.execution_mode == "sequential":
+            all_data = []
+            for source in self.sources:
+                source_iterator = source.get_data()
+                source_data = self.show_source_stats(source, source_iterator)
+                all_data.extend(source_data)
+        else:
+            source_chunks = []
+            for source in self.sources:
+                source_chunks.append(list(source.get_data()))
+
+            collected = self.concurrent_processor.process_chunks(source_chunks, self._identity_data)
+
+            all_data = []
+            for item in collected:
+                if isinstance(item, list):
+                    all_data.extend(item)
+                else:
+                    all_data.append(item)
+
+            print(f"\nВсего собрано данных: {len(all_data)} записей")
+
+        collect_time = __import__('time').time() - start_collect
+        print(f"Время сбора данных: {collect_time:.4f} сек")
+
+        print("ЗАПУСК ОБРАБОТКИ ДАННЫХ ЧЕРЕЗ СТРАТЕГИИ")
+        start_process = __import__('time').time()
+        result = list(self.strategy.process(iter(all_data)))
+        process_time = __import__('time').time() - start_process
+
+        print(f"\nОбработано записей: {len(result)}")
+        print(f"Время обработки: {process_time:.4f} сек")
         print("ПРИЛОЖЕНИЕ УСПЕШНО ЗАВЕРШЕНО")
+
+        return result, collect_time + process_time

@@ -31,6 +31,10 @@ class AppConfig:
         self.price_range = "1000.0-5000.0"
         self.seller = "Норникель"
         self.strategy_type = "composite"
+        self.execution_mode = "processes"
+        self.chunk_size = 50
+        self.test_mode = False
+        self.test_data_size = 10000
         self._initialized = True
         if not self.alpha_vantage_api_key:
             print("ВНИМАНИЕ: ALPHA_VANTAGE_API_KEY не найден в .env файле")

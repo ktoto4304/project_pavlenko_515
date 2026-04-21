@@ -13,7 +13,7 @@ from .web_parsing import create_web_source_file
 
 
 def main():
-    """ТОчка входа."""
+    """Точка входа."""
     config = get_config()
     source1 = create_source("demo", {"name": config.demo_source_name})
     source2 = create_source("file", {"filename": config.file_source_path, "name": config.file_source_name})
