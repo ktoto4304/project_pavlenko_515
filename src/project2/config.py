@@ -29,6 +29,7 @@ class AppConfig:
         self.alpha_vantage_api_key = os.getenv("ALPHA_VANTAGE_API_KEY", "")
         self.categories = ["нефть", "газ", "золото", "медь"]
         self.price_range = "1000.0-5000.0"
+        self.run_mode = "async"
         self.seller = "Норникель"
         self.strategy_type = "composite"
         self.execution_mode = "processes"
