@@ -25,7 +25,7 @@ class ConcurrentProcessor:
         results = []
         for chunk in chunks:
             results.extend(worker_func(chunk))
-        print(f"  Последовательная обработка чанков: {time.time() - start:.4f} сек")
+        print(f"Последовательная обработка чанков: {time.time() - start:.4f} сек")
         return results
 
     def _run_threads(self, chunks: list[list], worker_func: Callable[[list], list]) -> list:
@@ -39,7 +39,7 @@ class ConcurrentProcessor:
                     results.extend(result)
                 else:
                     results.append(result)
-        print(f"  Потоковая обработка ({self.max_workers or 'auto'} воркеров): {time.time() - start:.4f} сек")
+        print(f"Потоковая обработка ({self.max_workers or 'auto'} воркеров): {time.time() - start:.4f} сек")
         return results
 
     def _run_processes(self, chunks: list[list], worker_func: Callable[[list], list]) -> list:
@@ -53,7 +53,7 @@ class ConcurrentProcessor:
                     results.extend(result)
                 else:
                     results.append(result)
-        print(f"  Процессная обработка ({self.max_workers or 'auto'} воркеров): {time.time() - start:.4f} сек")
+        print(f"Процессная обработка ({self.max_workers or 'auto'} воркеров): {time.time() - start:.4f} сек")
         return results
 
 
@@ -70,9 +70,7 @@ def measure_execution_time(func: Callable) -> Callable:
         result = func(*args, **kwargs)
         end_time = time.perf_counter()
         elapsed = end_time - start_time
-        print(f"\n{'='*50}")
         print(f"ВЫПОЛНЕНИЕ: {func.__name__}")
         print(f"Время выполнения: {elapsed:.4f} секунд")
-        print(f"{'='*50}")
         return result, elapsed
     return wrapper

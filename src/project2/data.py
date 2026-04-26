@@ -4,8 +4,7 @@ import os
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Iterator
-        
-import time
+
 from decorators import handle_db_errors
 
 
@@ -97,9 +96,11 @@ class Data:
 
 class Sellerinfo:
     """Информация о продавце."""
+
     def __init__(self, name: str, id: int) -> None:
-        self._id = id
-        self.name = name
+        """Инициализирует информацию о продавце."""
+        self._id: int = id
+        self.name: str = name
 
     @property
     def get_name(self) -> str:
@@ -113,7 +114,7 @@ class Sellerinfo:
 
 
 class Source(ABC):
-    """Класс источника."""
+    """Класс источника данных."""
 
     def __init__(self, name: str, source_type: str) -> None:
         """Инициализирует источник данных."""
@@ -144,7 +145,7 @@ class DemoSource(Source):
     """Демо-источник с данными прямо в коде."""
 
     def __init__(self, name: str = "Неизвестно") -> None:
-        """Инициализирует источник данных demo."""
+        """Инициализирует демо-источник данных."""
         super().__init__(name, "demo")
 
     def get_data(self) -> Iterator[Data]:
@@ -161,19 +162,18 @@ class DemoSource(Source):
             ["газ", "Газпром", 2, 5.23, "Оптовая партия"],
             ["медь", "Норникель", 1, 8912.34, "Нет примечаний"]
         ]
-
         for item in raw_list:
             yield Data(item[0], item[1], item[3], item[2], "demo", item[4])
 
 
 class AsyncDemoSource(AsyncSource):
-    """Асинхронный демо-источник с имитацией сетевой задержки."""
+    """Асинхронный демо-источник с имитацией задержки."""
 
     def __init__(self, name: str = "Неизвестно", delay: float = 0.1) -> None:
         """Инициализирует асинхронный демо-источник."""
         super().__init__(name, "async_demo")
-        self.delay = delay
-        self._raw = [
+        self.delay: float = delay
+        self._raw: list[list] = [
             ["медь", "Норникель", 1, 8745.23, "Нет примечаний"],
             ["газ", "Газпром", 2, 4.87, "Срочная поставка"],
             ["золото", "Полюс", 3, 1956.50, "Высокое качество"],
@@ -190,8 +190,7 @@ class AsyncDemoSource(AsyncSource):
         """Асинхронно генерирует данные с имитацией задержки."""
         for i, item in enumerate(self._raw, 1):
             await asyncio.sleep(self.delay)
-            data = Data(item[0], item[1], item[3], item[2], "async_demo", item[4])
-            yield data
+            yield Data(item[0], item[1], item[3], item[2], "async_demo", item[4])
 
 
 class FileSource(Source):
@@ -200,7 +199,7 @@ class FileSource(Source):
     def __init__(self, filename: str, name: str = "Неизвестно") -> None:
         """Инициализирует файловый источник данных."""
         super().__init__(name, "file")
-        self.path = os.path.abspath(filename)
+        self.path: str = os.path.abspath(filename)
 
     @handle_db_errors
     def get_data(self) -> Iterator[Data]:
@@ -220,7 +219,6 @@ class FileSource(Source):
                 elif isinstance(item, list):
                     name, seller, seller_id, price, note = item
                 else:
-                    print(f"Строка {line_num}: Неподдерживаемый формат")
                     continue
                 yield Data(name, seller, price, seller_id, "file", note)
 
@@ -231,30 +229,16 @@ class AsyncFileSource(AsyncSource):
     def __init__(self, filename: str, name: str = "Неизвестно", delay: float = 0.2) -> None:
         """Инициализирует асинхронный файловый источник."""
         super().__init__(name, "async_file")
-        self.path = os.path.abspath(filename)
-        self.delay = delay
-        self._lines = []
-
-    def _load_lines(self) -> None:
-        """Загружает все строки из файла."""
-        if not os.path.exists(self.path):
-            print(f"[{self.name}] Файл {self.path} не найден")
-            return
-
-        with open(self.path, encoding='utf-8') as f:
-            self._lines = [line.strip() for line in f if line.strip()]
+        self.path: str = os.path.abspath(filename)
+        self.delay: float = delay
 
     async def get_data_async(self) -> AsyncIterator[Data]:
         """Асинхронно читает данные из файла с имитацией I/O."""
         loop = asyncio.get_running_loop()
-        self._lines = []
-        await loop.run_in_executor(None, self._load_lines)
-
-        total = len(self._lines)
-
-        for i, line in enumerate(self._lines, 1):
+        lines: list[str] = []
+        await loop.run_in_executor(None, self._load_lines, lines)
+        for i, line in enumerate(lines, 1):
             await asyncio.sleep(self.delay)
-
             try:
                 item = json.loads(line)
                 if isinstance(item, dict):
@@ -266,41 +250,17 @@ class AsyncFileSource(AsyncSource):
                 elif isinstance(item, list):
                     name, seller, seller_id, price, note = item
                 else:
-                    print(f"[{self.name}] Строка {i}: Неподдерживаемый формат")
                     continue
-
-                data = Data(name, seller, price, seller_id, "async_file", note)
-                yield data
-
-            except (json.JSONDecodeError, ValueError, TypeError) as e:
-                print(f"[{self.name}] Ошибка в строке {i}: {e}")
+                yield Data(name, seller, price, seller_id, "async_file", note)
+            except (json.JSONDecodeError, ValueError, TypeError):
                 continue
 
-        print(f"[{self.name}] Чтение файла завершено")
-
-
-class DemoSyncWithDelay(DemoSource):
-    def __init__(self, name: str = "Неизвестно", delay: float = 0.1):
-        super().__init__(name)
-        self.delay = delay
-    
-    def get_data(self):
-        for item in self._raw:
-            time.sleep(self.delay)
-            yield Data(item[0], item[1], item[3], item[2], "demo", item[4])
-
-
-class FileSyncWithDelay(FileSource):
-    def __init__(self, filename: str, name: str = "Неизвестно", delay: float = 0.2):
-        super().__init__(filename, name)
-        self.delay = delay
-    
-    def get_data(self):
+    def _load_lines(self, lines: list[str]) -> None:
+        """Загружает строки из файла в переданный список."""
+        if not os.path.exists(self.path):
+            return
         with open(self.path, encoding='utf-8') as f:
             for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                time.sleep(self.delay)
-                item = json.loads(line)
-                yield Data(item["name"], item["seller"], float(item["price"]), int(item["seller_id"]), "file", item.get("note", ""))
+                stripped = line.strip()
+                if stripped:
+                    lines.append(stripped)
