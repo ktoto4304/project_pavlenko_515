@@ -1,131 +1,211 @@
-import json
-import os
+import asyncio
+import random
 import time
-from typing import Any
+from collections.abc import AsyncIterator
 
-import requests
+import httpx
 
 from ..config import get_config
-from .abtract_pars import WebParser
+from ..data import AsyncSource, Data
 
 
-class AlphaVantageParser(WebParser):
-    """Парсер для Alpha Vantage API с задержками между запросами."""
+class RateLimiter:
+    """Token-bucket rate limiter для asyncio."""
+    def __init__(self, rate: float) -> None:
+        self._interval = 1.0 / rate if rate > 0 else 0.0
+        self._lock = asyncio.Lock()
+        self._next_time = 0.0
 
-    def __init__(self, api_key: str, source_name: str = "Alpha Vantage"):
+    async def acquire(self) -> None:
+        async with self._lock:
+            now = time.monotonic()
+            wait = max(0.0, self._next_time - now)
+            self._next_time = max(now, self._next_time) + self._interval
+        if wait > 0:
+            await asyncio.sleep(wait)
+
+
+class AlphaVantageParser(AsyncSource):
+    """Асинхронный потоковый источник с Alpha Vantage API."""
+    def __init__(
+        self,
+        api_key: str,
+        source_name: str = "Alpha Vantage",
+        max_concurrency: int = 2,
+        rate_per_second: float = 0.1,
+        max_attempts: int = 3,
+        base_delay: float = 1.0,
+        timeout: float = 30.0,
+    ) -> None:
+        super().__init__(source_name, "async_web")
         self.api_key = api_key
-        self.source_name = source_name
-        self.data: list[dict[str, Any]] | None = None
         self.config = get_config()
         self.base_url = self.config.web_api_url
-        self.request_delay = 12
 
-    def fetch_data(self) -> list[dict[str, Any]] | None:
-        """Получает данные напрямую из API."""
-        if os.path.exists(self.config.web_source_path):
-            print("Используем существующий файл веб-источника")
-            return self._load_existing_data()
-        print("Запрос данных из Alpha Vantage API...")
-        api_data = self._fetch_from_api()
-        if api_data:
-            processed_data = self._process_api_response(api_data)
-            if processed_data:
-                self.data = processed_data
-                print(f"Получено {len(self.data)} записей из API")
-                return self.data
-            print("Не удалось обработать данные из API")
-            return None
-        print("ОШИБКА: API недоступен")
+        self._sem = asyncio.Semaphore(max_concurrency)
+        self._limiter = RateLimiter(rate_per_second)
+
+        self.max_attempts = max_attempts
+        self.base_delay = base_delay
+        self.timeout = timeout
+
+        self.symbols: dict[str, str] = {
+            "XOM": "нефть",
+            "FCX": "медь",
+            "GDX": "золото",
+            "SLV": "серебро",
+            "UNG": "газ",
+        }
+        self.requests_total: int = 0
+        self.requests_ok: int = 0
+        self.requests_failed: int = 0
+        self.retries: int = 0
+        self.items_collected: int = 0
+
+    async def get_data_async(self) -> AsyncIterator[Data]:
+        """Асинхронный поток данных из API."""
+        print("АСИНХРОННЫЙ ВЕБ-ПАРСЕР")
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            tasks = [
+                asyncio.create_task(self._fetch_symbol(client, sym, name))
+                for sym, name in self.symbols.items()
+            ]
+            for coro in asyncio.as_completed(tasks):
+                try:
+                    items = await coro
+                    if items:
+                        for data_item in items:
+                            self.items_collected += 1
+                            yield data_item
+                except Exception as exc:
+                    print(f"[ERROR] Запрос завершился ошибкой: {exc}")
+        print("МЕТРИКИ")
+        print(f"Запросов всего:    {self.requests_total}")
+        print(f"Успешных:          {self.requests_ok}")
+        print(f"Неудачных:         {self.requests_failed}")
+        print(f"Повторов:          {self.retries}")
+        print(f"Собрано записей:   {self.items_collected}")
+
+    async def _fetch_symbol(
+        self, client: httpx.AsyncClient, symbol: str, name: str
+    ) -> list[Data] | None:
+        """Запрос одного символа с повторными попытками."""
+        print(f"[СТАРТ] {name} ({symbol})")
+
+        for attempt in range(1, self.max_attempts + 1):
+            result = await self._make_request(client, symbol, name, attempt)
+            if result is not None:
+                return result
+
+        self.requests_failed += 1
+        print(f"[FAIL] {name} ({symbol}): попытки исчерпаны")
         return None
 
-    def _fetch_from_api(self) -> dict[str, Any] | None:
-        """Выполняет запросы к API со всеми символами и задержками."""
-        symbols = {'XOM': 'нефть', 'FCX': 'медь', 'GDX': 'золото', 'SLV': 'серебро','UNG': 'газ'}
-        all_data = {}
-        for i, (symbol, commodity_name) in enumerate(symbols.items(), 1):
-            print(f"\n[{i}/{len(symbols)}] Запрос данных для {commodity_name} ({symbol})...")
-            params = {"function": "TIME_SERIES_DAILY","symbol": symbol, "apikey": self.api_key,"outputsize": "compact"}
-            response = requests.get(self.base_url, params=params, timeout=30)
-            response.raise_for_status()
-            data = response.json()
-            if "Error Message" in data:
-                print(f"Ошибка API для {symbol}: {data['Error Message']}")
-                continue
-            if "Note" in data:
-                print(f"API ограничение для {symbol}: {data['Note']}")
-                print(f"Ожидание {self.request_delay * 2} секунд...")
-                time.sleep(self.request_delay * 2)
-                response = requests.get(self.base_url, params=params, timeout=30)
+    async def _make_request(
+        self, client: httpx.AsyncClient, symbol: str, name: str, attempt: int
+    ) -> list[Data] | None:
+        """Один HTTP-запрос с ограничениями и обработкой ошибок."""
+        async with self._sem:
+            await self._limiter.acquire()
+            self.requests_total += 1
+
+            params = {
+                "function": "TIME_SERIES_DAILY",
+                "symbol": symbol,
+                "apikey": self.api_key,
+                "outputsize": "compact",
+            }
+
+            try:
+                response = await client.get(self.base_url, params=params)
+                status = response.status_code
+            except httpx.TransportError as exc:
+                return await self._handle_transport_error(symbol, name, attempt, exc)
+            if status == 200:
                 data = response.json()
-                if "Error Message" in data or "Note" in data:
-                    print("Повторный запрос также не удался")
-                    continue
-            if "Time Series (Daily)" in data:
-                all_data[symbol] = data
-                print(f"Успешно получены данные для {commodity_name}")
-                time_series = data["Time Series (Daily)"]
-                print(f"Получено {len(time_series)} дней данных")
-            if i < len(symbols):
-                print(f"Ожидание {self.request_delay} секунд перед следующим запросом...")
-                time.sleep(self.request_delay)
-        return all_data if all_data else None
+                if "Error Message" in data:
+                    print(f"[API ERROR] {name}: {data['Error Message']}")
+                    self.requests_failed += 1
+                    return None
+                if "Note" in data:
+                    print(f"[API LIMIT] {name}: частота превышена, ждём 60с")
+                    await asyncio.sleep(60)
+                    if attempt < self.max_attempts:
+                        self.retries += 1
+                        return await self._make_request(client, symbol, name, attempt + 1)
+                    self.requests_failed += 1
+                    return None
+                self.requests_ok += 1
+                items = self._parse_response(symbol, name, data)
+                print(f"[OK] {name} ({symbol}): {len(items)} записей")
+                return items
+            if status in (429, 503):
+                wait = self._parse_retry_after(response.headers.get("Retry-After", ""))
+                print(f"[{status}] {name}: ждём {wait:.1f}с")
+                await asyncio.sleep(wait)
+                if attempt < self.max_attempts:
+                    self.retries += 1
+                    return await self._make_request(client, symbol, name, attempt + 1)
+                self.requests_failed += 1
+                return None
+            if status >= 500:
+                return await self._handle_server_error(symbol, name, attempt, status)
+            if 400 <= status < 500:
+                print(f"[CLIENT ERROR] {name}: {status}")
+                self.requests_failed += 1
+                return None
 
-    def _load_existing_data(self) -> list[dict[str, Any]] | None:
-        """Загружает существующие данные из файла."""
-        with open(self.config.web_source_path, encoding='utf-8') as f:
-            data = []
-            for line in f:
-                if line.strip():
-                    data.append(json.loads(line))
-            self.data = data
-            print(f"Загружено {len(self.data)} записей из файла")
-            return data
+            self.requests_failed += 1
+            return None
 
-    def _process_api_response(self, data: dict) -> list[dict[str, Any]]:
-        """Обрабатывает ответ API и преобразует в нужный формат."""
-        all_data = []
-        for symbol, content in data.items():
-            commodity_name = self._get_commodity_name(symbol)
-            if not commodity_name:
-                print(f"Неизвестный символ: {symbol}")
+    async def _handle_transport_error(
+        self, symbol: str, name: str, attempt: int, exc: Exception
+    ) -> list[Data] | None:
+        """Обработка транспортной ошибки."""
+        if attempt < self.max_attempts:
+            delay = self.base_delay * (2 ** (attempt - 1)) + random.uniform(0, self.base_delay)
+            print(f"[RETRY] {name}: транспортная ошибка, попытка {attempt}/{self.max_attempts}, ждём {delay:.1f}с")
+            self.retries += 1
+            await asyncio.sleep(delay)
+            return None
+        print(f"[TRANSPORT ERROR] {name}: {exc!r}")
+        return None
+
+    async def _handle_server_error(
+        self, symbol: str, name: str, attempt: int, status: int
+    ) -> list[Data] | None:
+        """Обработка 5xx."""
+        if attempt < self.max_attempts:
+            delay = self.base_delay * (2 ** (attempt - 1)) + random.uniform(0, self.base_delay)
+            print(f"[RETRY] {name}: {status}, попытка {attempt}/{self.max_attempts}, ждём {delay:.1f}с")
+            self.retries += 1
+            await asyncio.sleep(delay)
+            return None
+        print(f"[SERVER ERROR] {name}: {status}")
+        return None
+
+    def _parse_response(self, symbol: str, name: str, data: dict) -> list[Data]:
+        """Разбирает JSON-ответ в список Data."""
+        time_series = data.get("Time Series (Daily)", {})
+        result = []
+        for date, values in list(time_series.items())[:30]:
+            price = float(values.get("4. close", 0))
+            if price <= 0:
                 continue
+            result.append(Data(
+                name=name,
+                seller_name="Global Market",
+                price=round(price, 2),
+                seller_id=999,
+                source="Alpha Vantage",
+                note=f"Символ: {symbol}, дата: {date}",
+            ))
+        return result
 
-            time_series = content.get("Time Series (Daily)", {})
-            if not time_series:
-                continue
-            records_added = 0
-            for date, values in list(time_series.items())[:30]:
-                price = float(values.get("4. close", 0))
-                if price > 0:
-                    all_data.append({"name": commodity_name,"seller": "Global Market",
-                        "seller_id": 999,"price": round(price, 2),
-                        "note": f"{self.source_name}, символ: {symbol}, дата: {date}"})
-                    records_added += 1
-            print(f"Добавлено {records_added} записей для {commodity_name}")
-
-        if not all_data:
-            print("Не удалось получить данные из API")
-            return []
-        return all_data
-
-    def _get_commodity_name(self, symbol: str) -> str:
-        """Определяет название сырья по символу."""
-        mapping = {'XOM': 'нефть', 'FCX': 'медь', 'GDX': 'золото', 'SLV': 'серебро','UNG': 'газ'}
-        return mapping.get(symbol, '')
-
-    def save_to_file(self, filename: str) -> bool:
-        """Сохраняет данные в файл."""
-        if not self.data:
-            print("Нет данных для сохранения")
-            return False
-        os.makedirs(os.path.dirname(filename) or '.', exist_ok=True)
-        with open(filename, 'w', encoding='utf-8') as f:
-            for item in self.data:
-                json.dump(item, f, ensure_ascii=False)
-                f.write('\n')
-        print(f"Данные сохранены в {filename}")
-        commodities = {}
-        for item in self.data:
-            name = item['name']
-            commodities[name] = commodities.get(name, 0) + 1
-        return True
+    @staticmethod
+    def _parse_retry_after(header: str) -> float:
+        """Разбирает заголовок Retry-After в секунды."""
+        header = header.strip()
+        if header.isdigit():
+            return float(header)
+        return 5.0
