@@ -188,7 +188,7 @@ class AsyncDemoSource(AsyncSource):
 
     async def get_data_async(self) -> AsyncIterator[Data]:
         """Асинхронно генерирует данные с имитацией задержки."""
-        for i, item in enumerate(self._raw, 1):
+        for _i, item in enumerate(self._raw, 1):
             await asyncio.sleep(self.delay)
             yield Data(item[0], item[1], item[3], item[2], "async_demo", item[4])
 
@@ -205,7 +205,7 @@ class FileSource(Source):
     def get_data(self) -> Iterator[Data]:
         """Генерирует объекты Data из файла по одному."""
         with open(self.path, encoding='utf-8') as f:
-            for line_num, line in enumerate(f, 1):
+            for _line_num, line in enumerate(f, 1):
                 line = line.strip()
                 if not line:
                     continue
@@ -237,7 +237,7 @@ class AsyncFileSource(AsyncSource):
         loop = asyncio.get_running_loop()
         lines: list[str] = []
         await loop.run_in_executor(None, self._load_lines, lines)
-        for i, line in enumerate(lines, 1):
+        for _i, line in enumerate(lines, 1):
             await asyncio.sleep(self.delay)
             try:
                 item = json.loads(line)

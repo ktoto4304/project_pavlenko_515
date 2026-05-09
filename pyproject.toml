@@ -8,6 +8,7 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "aiogram>=3.27.0",
     "python-dotenv>=1.2.1",
 ]
 
@@ -17,6 +18,7 @@ build-backend = "uv_build"
 
 [project.scripts]
 project2 = "project2.main:main"
+project2-bot = "project2.bot.bot:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -54,9 +56,7 @@ select = [
   "G",
   "ANN",
 ]
-allowed-confusables = [
-    "б", "с", "р", "о", "а", "е", "Н", "А", "З", "М", "Р", "О", "Т", "Ь", "Б", "В"
-]
+allowed-confusables = ["б", "с", "р", "о", "а", "е", "Н", "А", "З", "М", "Р", "О", "Т", "Ь", "Б", "В", "г", "С", "х", "К", "Е"]
 ignore = [
     "D100", "D104", "D102", "D105", "D107",
     "D401", "D404", "D417",

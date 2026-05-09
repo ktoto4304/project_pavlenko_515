@@ -6,17 +6,12 @@ from .processing_strategies import ProcessingStrategy
 
 
 def _heavy_process_chunk(chunk: list[Data], strategy: ProcessingStrategy) -> list[Data]:
-    """Чистая функция для обработки чанка данных в executor.
-    Не делает вывода, не обращается к глобальному состоянию.
-    """
+    """Чистая функция для обработки чанка данных в executor."""
     return list(strategy.process(iter(chunk)))
 
 
 class TaskManager:
-    """Управляющий компонент задач. Принимает входной поток данных,
-    планирует обработку, отправляет часть работы в executor и возвращает
-    поток обработанных результатов обратно в приложение.
-    """
+    """Управляющий компонент задач."""
 
     def __init__(self, max_workers: int | None = None) -> None:
         """Инициализирует TaskManager с указанным количеством workers."""
@@ -28,10 +23,7 @@ class TaskManager:
 
     async def process_with_executor(self,data: list[Data],
         strategy: ProcessingStrategy,chunk_size: int = 50,use_processes: bool = False) -> list[Data]:
-        """Обрабатывает данные через executor. Разделяет на чанки, запускает
-        обработку каждого чанка в executor, собирает результаты.
-        Порядок результатов сохраняется.
-        """
+        """Обрабатывает данные через executor."""
         if not data:
             return []
 

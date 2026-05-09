@@ -29,16 +29,21 @@ class Application:
         self.task_manager: TaskManager = TaskManager(
             max_workers=self.config.max_workers
         )
+        self._web_source_initialized: bool = False
 
     def add_async_source(self, source: AsyncSource) -> None:
         """Добавляет асинхронный источник данных."""
         self.async_sources.append(source)
 
     def setup_web_source(self) -> None:
-        """Настраивает веб-источник данных."""
+        if self._web_source_initialized:
+            return
+        self._web_source_initialized = True
+
         if self.config.test_mode:
             print("ТЕСТОВЫЙ РЕЖИМ: веб-источник пропущен")
             return
+
         if os.path.exists(self.config.web_source_path):
             print(f"Файл {self.config.web_source_path} уже существует — используем как файловый источник")
             from .sourcefactory import create_source
@@ -48,21 +53,18 @@ class Application:
             })
             self.sources.append(web_file_source)
             return
-        print("НАСТРОЙКА АСИНХРОННОГО ВЕБ-ПАРСЕРА")
+
+        print("\n=== НАСТРОЙКА АСИНХРОННОГО ВЕБ-ПАРСЕРА ===")
         parser = create_web_parser(
             self.config.web_parser_type,
             api_key=self.config.alpha_vantage_api_key,
             source_name=self.config.web_source_name,
-            max_concurrency=2,
-            rate_per_second=0.1,
-            max_attempts=3,
         )
         if parser:
             self.add_async_source(parser)
             print("Асинхронный веб-источник добавлен (данные потоком в обработчик)\n")
         else:
             print("ВНИМАНИЕ: не удалось создать веб-источник\n")
-
     def _print_results(self, data: list[Data], total_time: float) -> None:
         """Выводит результаты обработки и всех фильтраций."""
         if not data:
@@ -153,7 +155,6 @@ class Application:
         result = self.strategy.process(iter(all_data))
         process_time = time.time() - start_process
         total = collect_time + process_time
-        self._print_results(result, total)
         return result, total
 
     def run_with_delay(self) -> tuple[list[Data], float]:
@@ -172,8 +173,6 @@ class Application:
         result = self.strategy.process(iter(all_data))
         process_time = time.perf_counter() - start_process
         total = collect_time + process_time
-
-        self._print_results(result, total)
         return result, total
     async def run_async(self) -> tuple[list[Data], float]:
         """Асинхронный запуск приложения."""
@@ -201,7 +200,6 @@ class Application:
         process_time = time.perf_counter() - start_process
         total = collect_time + process_time
 
-        self._print_results(result, total)
         return result, total
 
     async def run_hybrid(self) -> tuple[list[Data], float]:
@@ -234,7 +232,6 @@ class Application:
         print(f"Гибридная обработка ({executor_type}): {process_time:.4f} сек")
         print(f"Общее время (hybrid): {total:.4f} сек")
 
-        self._print_results(result, total)
         return result, total
     async def _collect_async_source(self, source: AsyncSource) -> list[Data]:
         """Собирает все данные из асинхронного источника."""

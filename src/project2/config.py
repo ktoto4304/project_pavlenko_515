@@ -17,7 +17,6 @@ class AppConfig:
         return cls._instance
 
     def __init__(self) -> None:
-        """Инициализация конфигурации."""
         if self._initialized:
             return
         self.demo_source_name: str = "Рынок Энергоносителей"
@@ -39,6 +38,16 @@ class AppConfig:
         self.run_mode: str = "hybrid"
         self.max_workers: int = 4
         self.hybrid_executor: str = "threads"
+
+        self.web_max_concurrency: int = 2
+        self.web_rate_per_second: float = 0.1
+        self.web_max_attempts: int = 3
+        self.web_base_delay: float = 1.0
+        self.web_connect_timeout: float = 5.0
+        self.web_read_timeout: float = 15.0
+        self.web_write_timeout: float = 5.0
+        self.web_pool_timeout: float = 2.0
+
         self._initialized: bool = True
         if not self.alpha_vantage_api_key:
             print("ВНИМАНИЕ: ALPHA_VANTAGE_API_KEY не найден в .env файле")
