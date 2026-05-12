@@ -91,7 +91,7 @@ class Data:
         """Равно (=) - по уникальному ID."""
         if not isinstance(second, Data):
             return NotImplemented
-        return self.id == second.id
+        return self._record_id == second._record_id
 
 
 class Sellerinfo:

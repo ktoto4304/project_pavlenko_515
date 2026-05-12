@@ -4,7 +4,7 @@ import random
 from ..data import Data, Source
 
 
-class TestDataGenerator:
+class DataGenerator:
     """Генератор создания тестовых данных."""
     def __init__(self, source: Source):
         self.source = source

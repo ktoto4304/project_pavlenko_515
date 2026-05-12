@@ -6,17 +6,14 @@ import requests
 
 
 def handle_db_errors[**P, R](func: Callable[P, R]) -> Callable[P, R | None]:
-    """Декоратор для поимки ошибок."""
+    """Декоратор для обработки ошибок ввода-вывода."""
     @wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R | None:
         try:
             return func(*args, **kwargs)
         except FileNotFoundError:
             print("Ошибка: Файл не найден.")
-        except ValueError as e:
-            print(f"Ошибка валидации: {e}")
-        except TypeError as e:
-            print(f"Ошибка типов вводимых значений: {e}")
+            return None
         except requests.exceptions.Timeout:
             print("Ошибка: Таймаут при подключении")
             return None
@@ -30,7 +27,6 @@ def handle_db_errors[**P, R](func: Callable[P, R]) -> Callable[P, R | None]:
             print(f"Ошибка парсинга JSON: {e}")
             return None
         except OSError as e:
-            print(f"Ошибка при сохранении файла: {e}")
+            print(f"Ошибка при работе с файлом: {e}")
             return False
-        return None
     return wrapper
