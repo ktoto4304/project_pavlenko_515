@@ -1,0 +1,86 @@
+[project]
+name = "project2"
+version = "0.1.0"
+description = "An application for analyzing commodity prices (oil, gas, and metals)."
+readme = "README.md"
+authors = [
+    { name = "ktoto4304", email = "dp4wlenko@yandex.ru" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "aiogram>=3.27.0",
+    "python-dotenv>=1.2.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.10.2,<0.11.0"]
+build-backend = "uv_build"
+
+[project.scripts]
+project2 = "project2.main:main"
+project2-bot = "project2.bot.bot:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+    "pytest-mock>=3.15.1",
+    "ruff>=0.15.1",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+indent-width = 4
+src = ["src"]
+exclude = ["venv", ".venv", "dist", "__pycache__"]
+force-exclude = true
+
+[tool.ruff.lint]
+preview = false
+select = [
+  "F", "E", "W", "I", "UP",
+  "B", "C4",
+  "RET", "BLE",
+  "DTZ",
+  "S",
+  "T10", "T20",
+  "PT",
+  "RUF",
+  "N",
+  "D",
+  "ASYNC",   
+  "G",
+  "ANN",
+]
+allowed-confusables = ["б", "с", "р", "о", "а", "е", "Н", "А", "З", "М", "Р", "О", "Т", "Ь", "Б", "В", "г", "С", "х", "К", "Е"]
+ignore = [
+    "D100", "D104", "D102", "D105", "D107",
+    "D401", "D404", "D417",
+    "RUF002",
+    "ANN003",
+    "ANN002",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+quote-style = "double" 
+indent-style = "space" 
+
+[tool.ruff.lint.flake8-annotations]
+ignore-fully-untyped = true
+suppress-none-returning = true
+mypy-init-return = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["D", "S", "ANN"]
+"src/**/__main__.py" = ["T201"]
+"src/**/cli.py" = ["T201"]
