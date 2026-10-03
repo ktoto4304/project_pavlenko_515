@@ -9,7 +9,9 @@ authors = [
 requires-python = ">=3.12"
 dependencies = [
     "aiogram>=3.27.0",
+    "httpx>=0.28.1",
     "python-dotenv>=1.2.1",
+    "requests>=2.34.2",
 ]
 
 [build-system]
@@ -84,3 +86,8 @@ mypy-init-return = true
 "tests/**/*.py" = ["D", "S", "ANN"]
 "src/**/__main__.py" = ["T201"]
 "src/**/cli.py" = ["T201"]
+
+[tool.pytest.ini_options]
+testpaths = ["src/project2/tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "strict"
